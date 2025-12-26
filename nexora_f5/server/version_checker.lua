@@ -3,30 +3,16 @@ local GITHUB_REPO = "Nexora-Developments-Fivem/nexora_f5"
 local GITHUB_API_URL = ("https://api.github.com/repos/%s/releases/latest"):format(GITHUB_REPO)
 local RESOURCE_NAME = GetCurrentResourceName()
 
-local function PrintHeader()
-    print("^0╔════════════════════════════════════════════════════════════╗^0")
-    print("^0║^5              NEXORA DEVELOPMENTS - VERSION CHECK          ^0║^0")
-    print("^0╚════════════════════════════════════════════════════════════╝^0")
-end
-
-local function PrintSuccess(message)
-    print(("^0[^2Nexora Developments^0] ^2✓^0 %s^0"):format(message))
-end
-
-local function PrintWarning(message)
-    print(("^0[^3Nexora Developments^0] ^3⚠^0 %s^0"):format(message))
-end
-
-local function PrintError(message)
-    print(("^0[^1Nexora Developments^0] ^1✖^0 %s^0"):format(message))
-end
-
-local function PrintInfo(message)
-    print(("^0[^4Nexora Developments^0] ^4ℹ^0 %s^0"):format(message))
-end
-
-local function PrintDivider()
-    print("^0────────────────────────────────────────────────────────────^0")
+local function Log(level, message)
+    local prefix = ("^7[^5%s^7]"):format(RESOURCE_NAME)
+    local levelColors = {
+        INFO = "^4[INFO]^7",
+        SUCCESS = "^2[SUCCESS]^7",
+        WARNING = "^3[WARNING]^7",
+        ERROR = "^1[ERROR]^7",
+        DEBUG = "^6[DEBUG]^7"
+    }
+    print(("%s %s %s"):format(prefix, levelColors[level] or "", message))
 end
 
 ---@param current string Current version (e.g., "1.0.0")
@@ -62,93 +48,102 @@ local function CompareVersions(current, latest)
 end
 
 local function DisplayUpdateAvailable(latestVersion, releaseUrl)
-    print("\n")
-    print("^0╔════════════════════════════════════════════════════════════╗^0")
-    print("^0║^3                  ⚠ UPDATE AVAILABLE ⚠                    ^0║^0")
-    print("^0╠════════════════════════════════════════════════════════════╣^0")
-    print(("^0║  ^7Resource:       ^5%-37s^0║^0"):format(RESOURCE_NAME))
-    print(("^0║  ^7Current Version: ^1%-37s^0║^0"):format(CURRENT_VERSION))
-    print(("^0║  ^7Latest Version:  ^2%-37s^0║^0"):format(latestVersion))
-    print("^0╠════════════════════════════════════════════════════════════╣^0")
-    print("^0║  ^3A new version of this script is available.               ^0║^0")
-    print("^0║  ^7Please update to benefit from the latest improvements,  ^0║^0")
-    print("^0║  ^7bug fixes, and new features.                            ^0║^0")
-    print("^0╠════════════════════════════════════════════════════════════╣^0")
-    print(("^0║  ^4Download: ^6%-45s^0║^0"):format(releaseUrl))
-    print("^0╚════════════════════════════════════════════════════════════╝^0")
-    print("\n")
+    print("")
+    Log("WARNING", "^3UPDATE AVAILABLE^7")
+    Log("INFO", ("Current version: ^1%s^7"):format(CURRENT_VERSION))
+    Log("INFO", ("Latest version: ^2%s^7"):format(latestVersion))
+    Log("INFO", ("Download: ^6%s^7"):format(releaseUrl))
+    print("")
 end
 
 local function DisplayUpToDate()
-    print("\n")
-    PrintSuccess(("Script is up-to-date (Version: %s)"):format(CURRENT_VERSION))
-    print("\n")
+    Log("SUCCESS", ("Version ^2%s^7 is up to date"):format(CURRENT_VERSION))
 end
 
 local function CheckForUpdates()
-    PrintHeader()
-    PrintInfo("Verifying script version with GitHub repository...")
-    PrintDivider()
+    Log("INFO", "Checking for updates...")
     
-    PerformHttpRequest(GITHUB_API_URL, function(statusCode, responseData, headers)
-        if statusCode == 0 then
-            PrintError("Unable to connect to GitHub API.")
-            PrintWarning("Please verify your internet connection or GitHub availability.")
-            PrintInfo("Version check will be retried on next server restart.")
-            PrintDivider()
+    -- Vérifier d'abord si le repo existe
+    local repoCheckUrl = ("https://api.github.com/repos/%s"):format(GITHUB_REPO)
+    
+    PerformHttpRequest(repoCheckUrl, function(repoStatus, repoData, repoHeaders)
+        if repoStatus == 404 then
+            Log("ERROR", "Repository not found on GitHub")
+            Log("WARNING", ("Check if '%s' exists and is public"):format(GITHUB_REPO))
+            return
+        elseif repoStatus == 403 then
+            Log("ERROR", "GitHub API rate limit exceeded")
+            Log("WARNING", "Wait a few minutes before restarting the server")
+            return
+        elseif repoStatus ~= 200 then
+            Log("ERROR", ("Failed to verify repository: HTTP %d"):format(repoStatus))
             return
         end
         
-        if statusCode ~= 200 then
-            PrintError(("GitHub API returned error code: %d"):format(statusCode))
-            
-            if statusCode == 404 then
-                PrintWarning("Repository not found. Please check GITHUB_REPO configuration.")
-            elseif statusCode == 403 then
-                PrintWarning("GitHub API rate limit exceeded. Try again later.")
-            else
-                PrintWarning("An unexpected error occurred during version check.")
+        -- Le repo existe, maintenant vérifier les releases
+        PerformHttpRequest(GITHUB_API_URL, function(statusCode, responseData, headers)
+            if statusCode == 0 then
+                Log("ERROR", "Failed to connect to GitHub API")
+                Log("WARNING", "Check your internet connection")
+                return
             end
             
-            PrintDivider()
-            return
-        end
-        
-        local success, data = pcall(function()
-            return json.decode(responseData)
-        end)
-        
-        if not success or not data then
-            PrintError("Failed to parse GitHub API response.")
-            PrintWarning("The response format may have changed or is corrupted.")
-            PrintDivider()
-            return
-        end
-        
-        local latestVersion = data.tag_name or data.name
-        local releaseUrl = data.html_url
-        
-        if not latestVersion then
-            PrintError("Unable to extract version from GitHub release.")
-            PrintWarning("Please verify that a release exists on GitHub.")
-            PrintDivider()
-            return
-        end
-        
-        if CompareVersions(CURRENT_VERSION, latestVersion) then
-            DisplayUpdateAvailable(latestVersion, releaseUrl)
-        else
-            DisplayUpToDate()
-        end
+            if statusCode == 404 then
+                Log("WARNING", "No releases found for this repository")
+                Log("INFO", "Create a release on GitHub with a version tag (e.g., v1.0.0)")
+                Log("INFO", ("https://github.com/%s/releases/new"):format(GITHUB_REPO))
+                return
+            end
+            
+            if statusCode == 403 then
+                Log("ERROR", "GitHub API rate limit exceeded")
+                Log("WARNING", "Try again in a few minutes")
+                return
+            end
+            
+            if statusCode ~= 200 then
+                Log("ERROR", ("GitHub API error: HTTP %d"):format(statusCode))
+                return
+            end
+            
+            local success, data = pcall(function()
+                return json.decode(responseData)
+            end)
+            
+            if not success or not data then
+                Log("ERROR", "Failed to parse GitHub API response")
+                return
+            end
+            
+            local latestVersion = data.tag_name or data.name
+            local releaseUrl = data.html_url
+            
+            if not latestVersion then
+                Log("ERROR", "Unable to extract version from GitHub release")
+                Log("WARNING", "Make sure your release has a valid tag (e.g., v1.0.0)")
+                return
+            end
+            
+            if CompareVersions(CURRENT_VERSION, latestVersion) then
+                DisplayUpdateAvailable(latestVersion, releaseUrl)
+            else
+                DisplayUpToDate()
+            end
+            
+        end, "GET", "", {
+            ["Content-Type"] = "application/json",
+            ["User-Agent"] = "FiveM-Resource-Checker"
+        })
         
     end, "GET", "", {
         ["Content-Type"] = "application/json",
-        ["User-Agent"] = "Nexora-F5-Menu-Version-Checker"
+        ["User-Agent"] = "FiveM-Resource-Checker"
     })
 end
 
 CreateThread(function()
     Wait(1000)
-    
     CheckForUpdates()
 end)
+
+-- by tarek.dev
