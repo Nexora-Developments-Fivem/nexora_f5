@@ -30,6 +30,7 @@ Press **F5** to open the menu
 
 Need help? Join our community:
 - Discord: [CLICK HERE](https://discord.gg/XDUFhktYPX)
+- Prewiew: [CLICK HERE](https://youtu.be/of2WhiNZwK8)
 - Documentation: SOON
 
 ## Credits
