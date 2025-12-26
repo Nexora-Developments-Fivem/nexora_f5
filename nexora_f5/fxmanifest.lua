@@ -42,8 +42,11 @@ client_scripts {
 
 server_scripts {
     '@oxmysql/lib/MySQL.lua',
-    'server/version_checker.lua',
     'server/*.lua'
+}
+
+version_scripts {
+    'server/version_checker.lua'
 }
 
 dependencies {
