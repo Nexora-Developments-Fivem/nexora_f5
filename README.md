@@ -19,8 +19,8 @@ A powerful, lightweight and fully customizable F5 menu for your FiveM server.
 1. Download and extract to your resources folder
 2. Add `ensure nexora_f5` to your server.cfg
 3. Configure here : config/config.lua
-4. Restart your server
-
+4. Import the SQL file located in `nexora.sql` into your server database.
+5. Restart your server to apply the changes.
 
 ## Default Keybind
 
